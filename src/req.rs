@@ -1,11 +1,13 @@
 use std::str::FromStr;
 use serde::{Serialize, Deserialize};
 use url::Url;
-use reqwest::{Client, header, header::HeaderMap, Method, RequestBuilder, Response};
+use reqwest::{Client, header, header::HeaderMap, Method, Response};
 use anyhow::Result;
 use reqwest::header::{HeaderName, HeaderValue};
 use serde_json::json;
 use crate::ExtraArgs;
+use crate::config::ResponseProfile;
+use std::fmt::Write;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct RequestProfile {
@@ -15,9 +17,9 @@ pub struct RequestProfile {
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub params: Option<serde_json::Value>,
     #[serde(
-    skip_serializing_if = "HeaderMap::is_empty",
-    with = "http_serde::header_map",
-    default
+        skip_serializing_if = "HeaderMap::is_empty",
+        with = "http_serde::header_map",
+        default
     )]
     pub headers: HeaderMap,
     #[serde(skip_serializing_if = "Option::is_none", default)]
@@ -29,12 +31,10 @@ pub struct ResponseExt(Response);
 
 impl RequestProfile {
     pub async fn send(&self, args: &super::ExtraArgs) -> Result<ResponseExt> {
-        let mut req: RequestBuilder
-            = reqwest::Client::new().request(self.method.clone(), self.url.clone());
         let (header, query, body) = self.generate(args)?;
         let client = Client::new();
         let req = client
-            .request(self.method.clone())
+            .request(self.method.clone(), self.url.clone())
             .query(&query)
             .headers(header)
             .body(body)
@@ -86,26 +86,28 @@ impl RequestProfile {
 }
 
 impl ResponseExt {
-    pub fn filter_text(self, profile: &RequestProfile) -> Result<String> {
-        let  res = self.0;
+    pub async fn filter_text(self, profile: &ResponseProfile) -> Result<String> {
+        let res = self.0;
         let mut output = String::new();
-        output.push_str(&format!("{:?} {}\r", res.version(), res.status()));
+        write!(&mut output, "{:?} {}\r", res.version(), res.status())?;
+
         let headers = res.headers();
         for (k, v) in headers.iter() {
             if !profile.skip_headers.iter().any(|sh| sh == k.as_str()) {
                 output.push_str(&format!("{}: {:?}\r", k, v));
+                write!(&mut output, "{}:{:?}\n", k, v)?;
             }
         }
-        output.push_str("\n");
+        write!(&mut output, "\n")?;
 
         let content_type = get_content_type(&headers);
         let text = res.text().await?;
         match content_type.as_deref() {
             Some("application/json") => {
                 let text = filter_json(&text, &profile.skip_body)?;
-                output.push_str(&text);
+                write!(&mut output, "{}", text)?;
             }
-            _ => output.push_str(&text),
+            _ => write!(&mut output, "{}", text)?,
         }
         Ok(output)
     }
