@@ -1,0 +1,18 @@
+[package]
+name = "xdiff"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1.0.86"
+clap = { version = "4.5.7", features = ["derive"] }
+console = "0.15.8"
+http-serde = "2.1.1"
+reqwest = "0.12.4"
+serde = { version = "1.0.203", features = ["derive"] }
+serde_json = "1.0.117"
+serde_yaml = "0.9.34"
+similar = { version = "2.5.0", features = ["inline"] }
+tokio = { version = "1.38.0", features = ["full"] }
+url = { version = "2.5.1", features = ["serde"] }
+serde_urlencoded = "0.7.1"
