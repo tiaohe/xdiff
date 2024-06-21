@@ -17,9 +17,9 @@ pub struct RequestProfile {
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub params: Option<serde_json::Value>,
     #[serde(
-        skip_serializing_if = "HeaderMap::is_empty",
-        with = "http_serde::header_map",
-        default
+    skip_serializing_if = "HeaderMap::is_empty",
+    with = "http_serde::header_map",
+    default
     )]
     pub headers: HeaderMap,
     #[serde(skip_serializing_if = "Option::is_none", default)]
@@ -86,44 +86,58 @@ impl RequestProfile {
 }
 
 impl ResponseExt {
-    pub async fn filter_text(self, profile: &ResponseProfile) -> Result<String> {
+    pub async fn get_text(self, profile: &ResponseProfile) -> Result<String> {
         let res = self.0;
-        let mut output = String::new();
-        write!(&mut output, "{:?} {}\r", res.version(), res.status())?;
 
-        let headers = res.headers();
-        for (k, v) in headers.iter() {
-            if !profile.skip_headers.iter().any(|sh| sh == k.as_str()) {
-                output.push_str(&format!("{}: {:?}\r", k, v));
-                write!(&mut output, "{}:{:?}\n", k, v)?;
-            }
-        }
-        write!(&mut output, "\n")?;
+        let mut output = get_header_text(&res, &profile.skip_headers)?;
 
-        let content_type = get_content_type(&headers);
+        let content_type = get_content_type(res.headers());
         let text = res.text().await?;
         match content_type.as_deref() {
             Some("application/json") => {
                 let text = filter_json(&text, &profile.skip_body)?;
-                write!(&mut output, "{}", text)?;
+                writeln!(&mut output, "{}", text)?;
             }
-            _ => write!(&mut output, "{}", text)?,
+            _ => writeln!(&mut output, "{}", text)?,
         }
         Ok(output)
     }
 }
 
+fn get_header_text(
+    res: &Response,
+    skip_headers: &[String],
+) -> Result<String> {
+    let mut output = String::new();
+    writeln!(&mut output, "{:?} {}", res.version(), res.status())?;
+
+    let headers = res.headers();
+    for (k, v) in headers.iter() {
+        if !skip_headers.iter().any(|sh| sh == k.as_str()) {
+            output.push_str(&format!("{}: {:?}\r", k, v));
+            writeln!(&mut output, "{}: {:?}", k, v)?;
+        }
+    }
+    writeln!(&mut output, "\n")?;
+    Ok(output)
+}
+
 fn filter_json(text: &str, skip: &[String]) -> Result<String> {
     let mut json: serde_json::Value = serde_json::from_str(text)?;
 
-    match json {
+    if let serde_json::Value::Object(ref mut obj) = json {
+        for k in skip {
+            obj.remove(k);
+        }
+    }
+    /*match json {
         serde_json::Value::Object(ref mut obj) => {
             for k in skip {
                 obj.remove(k);
             }
         }
         _ => {}
-    }
+    }*/
 
     for k in skip {
         json.as_object_mut().unwrap().remove(k);
@@ -135,7 +149,8 @@ fn filter_json(text: &str, skip: &[String]) -> Result<String> {
 fn get_content_type(headers: &HeaderMap) -> Option<String> {
     headers
         .get(header::CONTENT_TYPE)
-        .map(|v| v.to_str().unwrap().split(';').next())
-        .flatten()
-        .map(|v| v.to_string())
+        .and_then(|v| v.to_str().unwrap().split(';').next().map(|v| v.to_string()))
+        // .map(|v| v.to_str().unwrap().split(';').next())
+        // .flatten()
+        // .map(|v| v.to_string())
 }
