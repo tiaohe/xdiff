@@ -14,6 +14,7 @@ pub struct Args {
 #[non_exhaustive]
 pub enum Action {
     Run(RunArgs),
+    Parse(),
 }
 
 #[derive(Debug, Parser, Clone)]

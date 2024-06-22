@@ -42,6 +42,27 @@ impl RequestProfile {
         let res = client.execute(req).await?;
         Ok(ResponseExt(res))
     }
+    pub(crate) fn validate(&self) -> Result<()> {
+        if let Some(params) = &self.params.as_ref() {
+            if !params.is_object() {
+                return Err(anyhow::anyhow!(
+                    "Params must be an object but got: \n{}",
+                    serde_yaml::to_string(params)?
+                ));
+            }
+        }
+
+        if let Some(body) = &self.body.as_ref() {
+            if !body.is_object() {
+                return Err(anyhow::anyhow!(
+                    "Body must be an object but got: \n{}",
+                    serde_yaml::to_string(body)?
+                ));
+            }
+        }
+        Ok(())
+    }
+
 
     pub fn generate(
         &self,
@@ -153,4 +174,11 @@ fn get_content_type(headers: &HeaderMap) -> Option<String> {
         // .map(|v| v.to_str().unwrap().split(';').next())
         // .flatten()
         // .map(|v| v.to_string())
+}
+
+impl FromStr for RequestProfile {
+    type Err = anyhow::Error;
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        todo!()
+    }
 }

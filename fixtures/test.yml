@@ -29,9 +29,3 @@ rust:
     method: GET
     url: https://www.rust-lang.org/
     params: {}
-  res:
-    skip_headers:
-      - set-cookie
-      - date
-      - via
-      - x-amz-cf-id
