@@ -43,6 +43,9 @@ impl ResponseProfile {
 }
 
 impl DiffConfig {
+    pub fn new(profiles: HashMap<String, DiffProfile>) -> Self {
+        Self { profiles }
+    }
     pub async fn load_yaml(path: &str) -> Result<Self> {
         let content = fs::read_to_string(path).await?;
         Self::from_yaml(&content)
@@ -67,7 +70,7 @@ impl DiffConfig {
 }
 
 impl DiffProfile {
-    pub fn new(req1: RequestProfile, req2: RequestProfile, res: Vec<String>) -> Self {
+    pub fn new(req1: RequestProfile, req2: RequestProfile, res: ResponseProfile) -> Self {
         Self {
             req1,
             req2,
